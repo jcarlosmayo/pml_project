@@ -13,7 +13,7 @@ The goal of your project is to predict the manner in which they did the exercise
 
 ```{r read training data}
 library(caret); library(ggplot2)
-train <- read.csv("data/pml-training.csv")
+raw_data <- read.csv("data/pml-training.csv")
 ```
 
 ## Cleaning data
@@ -25,14 +25,14 @@ na_var_id <- c()
 na_var_name <- c()
 na_percentage <- c()
 
-for (i in 1:ncol(train)){
+for (i in 1:ncol(raw_data)){
         # Check NA values for each of the variables
-        na_avg <- mean(is.na(train[,i]))
+        na_avg <- mean(is.na(raw_data[,i]))
         
         # If the NA average is larger than 0 collect it in the data frame
         if (na_avg > 0){
                 na_var_id <- c(na_var_id, i)
-                na_var_name <- c(na_var_name, names(train)[i])
+                na_var_name <- c(na_var_name, names(raw_data)[i])
                 na_percentage <- c(na_percentage, round(na_avg, 2))
         }
 }
@@ -47,7 +47,7 @@ rm(i, na_avg, na_var_id, na_var_name, na_percentage)
 ```
 67 variables display a very large amount of NA observations. Approximately 98% of the observations in each of those variables. It would be possible to impute them using the existing values but it seems far-fetched to recreate 98% of the data using the existing 2%. Ideally, each of the affected variables should be inspected to determine whether imputation is reasonable or not. However, for the purpose of this project, since imputing the missing values could introduce bias that would affect 98% of 67 variables in a set of 159, which amounts to approximately 41% of the total data, I will simply remove them from the training data.
 ```{r remove 98% na variables from train data}
-clean_train <- train[,-na_values$na_var_id]
+clean_data <- raw_data[,-na_values$na_var_id]
 ```
 
 ### Factor variables
@@ -57,8 +57,8 @@ On the resulting set there are 36 factor variables that have to be inspected to 
 # Empty vector to collect the id of factor variables
 factor_var <- c()
 count <- 0
-for (i in 7:(ncol(clean_train)-1)){
-        if (class(clean_train[,i])=="factor"){
+for (i in 7:(ncol(clean_data)-1)){
+        if (class(clean_data[,i])=="factor"){
                 count <- count + 1
                 factor_var <- c(factor_var, i)
         }
@@ -68,15 +68,15 @@ rm(i, count)
 ```
 For the remaining 33 variables, as they all seem to have been mistakenly entered as factors even though they contain numeric values, I will convert them to numeric values.
 
-```{r cleaning factor variables}
+```{r cleaning factor variables, message=FALSE, warning=FALSE}
 ############################################
 # Convert factors values to numeric values #
 ############################################
 
 for (i in 1:length(factor_var)){
-        x <- clean_train[, factor_var[i]]
+        x <- clean_data[, factor_var[i]]
         x <- as.numeric(levels(x))[x]
-        clean_train[, factor_var[i]] <- x
+        clean_data[, factor_var[i]] <- x
 }
 
 rm(x)
@@ -89,14 +89,14 @@ na_factor_var_id <- c()
 na_factor_var_name <- c()
 na_factor_percentage <- c()
 
-for (i in 1:ncol(clean_train)){
+for (i in 1:ncol(clean_data)){
         # Check NA values for each of the variables
-        na_avg <- mean(is.na(clean_train[,i]))
+        na_avg <- mean(is.na(clean_data[,i]))
         
         # If the NA average is larger than 0 collect it in the data frame
         if (na_avg > 0){
                 na_factor_var_id <- c(na_factor_var_id, i)
-                na_factor_var_name <- c(na_factor_var_name, names(clean_train)[i])
+                na_factor_var_name <- c(na_factor_var_name, names(clean_data)[i])
                 na_factor_percentage <- c(na_factor_percentage, round(na_avg, 2))
         }
 }
@@ -112,10 +112,32 @@ rm(i, na_avg, na_factor_var_id, na_factor_var_name, na_factor_percentage)
 
 
 ```{r remove 98% na factor variables from train data}
-clean_train <- clean_train[,-na_factor_values$na_factor_var_id]
+clean_data <- clean_data[,-na_factor_values$na_factor_var_id]
 ```
 
-## Split the train data into separate ones
+## Split data into train, testing and validation
+Before fitting a model I will split the data into three different sets, training, testing and validation, that will represent respectively 60%, 20% and 20% of the data.
+```{r split data}
+# Split the data into 60-40
+train <- createDataPartition(clean_data$classe,
+                             p = 0.6, list = FALSE)
+
+# Training set
+training <- clean_data[train,]
+
+# Create testing and validation sets
+test_valid <- clean_data[-train,]
+# Split the testing set into 50-50
+test <- createDataPartition(test_valid$classe,
+                            p = 0.5, list = FALSE)
+# Create the final testing set
+testing <- test_valid[test,]
+# Validation set
+validation <- test_valid[-test,]
+```
+
+
+
 
 ## Correlated predictors and PCA
 
