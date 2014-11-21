@@ -115,6 +115,12 @@ rm(i, na_avg, na_factor_var_id, na_factor_var_name, na_factor_percentage)
 clean_data <- clean_data[,-na_factor_values$na_factor_var_id]
 ```
 
+Additionally I will remove variables that are not relevant to the model, which are variables 1 to 7. They relate to observation's id, subject's name, time stamps and seemingly some observation window. These appear to track other values not directly related with the performance of the exercises.
+```{r non-relevant variables}
+names(clean_data)[1:7]
+clean_data <- clean_data[,-c(1:7)]
+```
+
 ## Split data into train, testing and validation
 Before fitting a model I will split the data into three different sets, training, testing and validation, that will represent respectively 60%, 20% and 20% of the data.
 ```{r split data}
@@ -134,16 +140,45 @@ test <- createDataPartition(test_valid$classe,
 testing <- test_valid[test,]
 # Validation set
 validation <- test_valid[-test,]
+
+# nrow(training) / nrow(clean_data)
+# nrow(testing) / nrow(clean_data)
+# nrow(validation) / nrow(clean_data)     
 ```
 
+## Prediction model
 
-
-
-## Correlated predictors and PCA
+### Correlated predictors and PCA
 
 We will leave out the last column in the data set, which is the outcome, 'classe'. We can then calculate the absolute value of the correlation between all the other variables, remove the correlation of a variable with itself, which will be the value displayed in the diagonal, and inspect the variables that show a correlation higher than 0.8.
 ```{r correlation and PCA}
 # Calculate the absolute correlation among all variables, except the outcome
 #cor_table <- abs(cor(train[,-160]))
 ```
+
+### Tree
+```{r tree}
+# Create the model
+tree_fit <- train(classe ~ . , method="rpart", data = training)
+
+# Compare model results against actual results
+table(predict(tree_fit, training), # Rows
+      training$classe) # Columns
+```
+
+
+### Bagging
+
+### Random forest
+```{r random forest}
+rf_fit <- train(classe ~ . , method="rf", data = training, prox = TRUE)
+
+# Compare model results against actual results
+table(predict(rf_fit, training), # Rows
+      training$classe) # Columns
+```
+
+### Boosting
+
+
 
