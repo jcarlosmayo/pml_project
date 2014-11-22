@@ -146,14 +146,14 @@ validation <- test_valid[-test,]
 # nrow(validation) / nrow(clean_data)     
 ```
 
-## Prediction model
+## Prediction models
 
 ### Correlated predictors and PCA
 
 We will leave out the last column in the data set, which is the outcome, 'classe'. We can then calculate the absolute value of the correlation between all the other variables, remove the correlation of a variable with itself, which will be the value displayed in the diagonal, and inspect the variables that show a correlation higher than 0.8.
 ```{r correlation and PCA}
 # Calculate the absolute correlation among all variables, except the outcome
-#cor_table <- abs(cor(train[,-160]))
+# cor_table <- abs(cor(training[,-53]))
 ```
 
 ### Tree
@@ -166,19 +166,154 @@ table(predict(tree_fit, training), # Rows
       training$classe) # Columns
 ```
 
-
 ### Bagging
 
 ### Random forest
 ```{r random forest}
+set.seed(2110)
 rf_fit <- train(classe ~ . , method="rf", data = training, prox = TRUE)
+rf_fit
 
-# Compare model results against actual results
-table(predict(rf_fit, training), # Rows
-      training$classe) # Columns
+getTree(rf_fit$finalModel)
+
+# Confusion matrix
+confusionMatrix(predict(rf_fit, training),
+      training$classe)
+```
+
+```{r importance var, fig.align = 'center'}
+importance <- as.data.frame(rf_fit$finalModel$importance)
+importance$var <- row.names(importance)
+library(dplyr)
+sort_importance <- arrange(importance, MeanDecreaseGini)
+
+sort_importance$var <- factor(sort_importance$var,
+                              levels = sort_importance$var)
+
+
+ggplot(sort_importance, aes(x = var, y=MeanDecreaseGini)) +
+        geom_point() +
+        coord_flip()
+
+ggplot(sort_importance, aes(x=var, y=MeanDecreaseGini)) +
+        geom_bar(stat="identity", fill="red", colour="white") +
+        coord_flip()
+
+
+# Take the 50% most important variables -> 26 variables
+var_26_imp <- as.character(sort_importance$var)[1:26]
+
+# Take the 25% most important variables -> 13 variables
+var_13_imp <- as.character(sort_importance$var)[1:13]
+
+# Take the 12.5% most important variables -> 7
+var_7_imp <- as.character(sort_importance$var)[1:7]
+```
+
+```{r random forest 26 variables, cache=TRUE}
+training_26 <- training[,c(var_26_imp, "classe")]
+rf_26_fit <- train(classe ~ . , data=training_25, method = "rf")
+
+# Confusion matrix
+confusionMatrix(predict(rf_26_fit, training_25),
+      training_26$classe)
+
+# 5-fold cross validation
+fitControl <- trainControl(method="cv", number=5)
+rf_26_cv_fit <- train(classe ~ . , data=training_26, method = "rf", trControl = fitControl)
+
+# Confusion matrix
+confusionMatrix(predict(rf_26_cv_fit, training_26),
+      training_26$classe)
+```
+
+```{r random forest 13 variables, cache=TRUE}
+training_13 <- training[,c(var_13_imp, "classe")]
+rf_13_fit <- train(classe ~ . , data=training_25, method = "rf")
+rf_13_fit
+
+# Confusion matrix
+confusionMatrix(predict(rf_13_fit, training_25),
+      training_13$classe)
+
+# 5-fold cross validation
+fitControl <- trainControl(method="cv", number=5)
+rf_13_cv_fit <- train(classe ~ . , data=training_13, method = "rf", trControl = fitControl)
+
+# Confusion matrix
+confusionMatrix(predict(rf_13_cv_fit, training_13),
+      training_13$classe)
+```
+
+```{r random forest 7 variables, cache=TRUE}
+# Standard bootstrapped random forest
+training_7 <- training[,c(var_7_imp, "classe")]
+rf_7_fit <- train(classe ~ . , data=training_7, method = "rf")
+rf_7_fit
+
+# Confusion matrix
+confusionMatrix(predict(rf_7_fit, training_7),
+                training_7$classe)
+
+
+# 5-fold cross validation
+fitControl <- trainControl(method="cv", number=5)
+rf_7_cv_fit <- train(classe ~ . , data=training_7, method = "rf", trControl = fitControl)
+
+# Confusion matrix
+confusionMatrix(predict(rf_7_cv_fit, training_7),
+                training_7$classe)
 ```
 
 ### Boosting
 
+## Testing the models
+Random forest with all valid variables, 53
+```{r test 53 variables}
+confusionMatrix(predict(rf_fit, testing),
+                testing$classe)
 
 
+```
+
+
+Random forest with 50% of the most important variables, 26
+```{r test 26 variables}
+testing_26 <- testing[,c(var_26_imp, "classe")]
+
+# Bootstrapped
+confusionMatrix(predict(rf_26_fit, testing_26),
+                testing_26$classe)
+
+# 5-fold cross validation
+confusionMatrix(predict(rf_26_cv_fit, testing_26),
+                testing_26$classe)
+```
+
+
+
+Random forest with 25% of the most important variables, 13
+```{r test 13 variables}
+testing_13 <- testing[,c(var_13_imp, "classe")]
+
+# Bootstrapped
+confusionMatrix(predict(rf_13_fit, testing_13),
+                testing_13$classe)
+
+# 5-fold cross validation
+confusionMatrix(predict(rf_13_cv_fit, testing_13),
+                testing_13$classe)
+```
+
+Random forest with 12.5% of the most important variables, 7
+```{r test 7 variables}
+testing_7 <- testing[,c(var_7_imp, "classe")]
+
+# Bootstrapped
+confusionMatrix(predict(rf_7_fit, testing_7),
+                testing_7$classe)
+
+# 5-fold cross validation
+confusionMatrix(predict(rf_7_cv_fit, testing_7),
+                testing_7$classe)
+```
