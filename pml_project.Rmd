@@ -1,319 +1,133 @@
 ---
-title: "Coursera - Practical Machine Learning"
+title: "Practical Machine Learning"
 output: html_document
 ---
 
-## Project description
-In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website [here](http://groupware.les.inf.puc-rio.br/har) under the section on the Weight Lifting Exercise Dataset. 
+## 1 - Description
+Six participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways while accelerometers on the belt, forearm, arm, and dumbell measured their performance. The original study and data can be found [here](http://groupware.les.inf.puc-rio.br/har) under the section on the Weight Lifting Exercise Dataset.
 
-The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+The goal of this project is to predict the manner in which they did the exercise. This is reflected in the "classe" variable, which can be either of five qualitative values: A, B, C, D or E.
 
-1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
-2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.
+## 2 - Data Cleaning
 
-```{r read training data}
-library(caret); library(ggplot2)
-raw_data <- read.csv("data/pml-training.csv")
-```
+Including the outcome variable, the data set contains 11,776 observations and 160 variables. However, a quick exploration of the data shows that there is a huge amount of missing values and that they are concentrated in a number of variables. No explanation is provided about why there are so many missing values although in fact they affect a large percentage of the data set. In 73 of the variables 98% of the observations are missing values, and in another 27 they reach 100%.
+  
+It would be possible to impute them using the existing values but it seems far-fetched to recreate 98% of the data using the existing 2%. Ideally, each of the affected variables should be inspected to determine whether imputation is reasonable or not. However, for the purpose of this project, I will simply remove them from the training data.
 
-## Cleaning data
+Additionally I will remove variables that are not relevant to the model, and which relate to observation's id, subject's name, time stamps and observation windows. These appear to track other values not directly related with the performance of the exercises and which would be meaningless once the model constructed is fit to new data.
 
-### NAs
-```{r NA values}
-# Emtpy vectors where to collect the results
-na_var_id <- c()
-na_var_name <- c()
-na_percentage <- c()
+Therefore, including the outcome variable, there remain 53 variables to train a machine learning model (see fig.1).
 
-for (i in 1:ncol(raw_data)){
-        # Check NA values for each of the variables
-        na_avg <- mean(is.na(raw_data[,i]))
-        
-        # If the NA average is larger than 0 collect it in the data frame
-        if (na_avg > 0){
-                na_var_id <- c(na_var_id, i)
-                na_var_name <- c(na_var_name, names(raw_data)[i])
-                na_percentage <- c(na_percentage, round(na_avg, 2))
-        }
-}
+## 3 - Model selection
+Before training different models to fit the data the clean training data was split into a training set, a testing set and a validation set, corresponding respectively to 60, 20 and 20% of the data.
 
-# Merge into a data frame
-na_values <- as.data.frame(cbind(na_var_id, na_var_name, na_percentage))
-# Assign correct data class to each column
-na_values[,1] <- as.integer(as.character(na_values[,1]))
-na_values[,2] <- as.character(na_values[,2])
-na_values[,3] <- as.numeric(as.character(na_values[,3]))
-rm(i, na_avg, na_var_id, na_var_name, na_percentage)
-```
-67 variables display a very large amount of NA observations. Approximately 98% of the observations in each of those variables. It would be possible to impute them using the existing values but it seems far-fetched to recreate 98% of the data using the existing 2%. Ideally, each of the affected variables should be inspected to determine whether imputation is reasonable or not. However, for the purpose of this project, since imputing the missing values could introduce bias that would affect 98% of 67 variables in a set of 159, which amounts to approximately 41% of the total data, I will simply remove them from the training data.
-```{r remove 98% na variables from train data}
-clean_data <- raw_data[,-na_values$na_var_id]
-```
+### 3.1 - Model training
+Initially a classification tree model was fit to the training set, however, the results were very poor. The in-sample accuracy was 49.91%, and , logically, it performed equally poor on the testing and validation sets with a 49.38% and 48.69% accuracay respectively.
 
-### Factor variables
+The next model fitted was a random forest with all variables, 52 plus the outcome, using the default settings, which uses bootstrapping with 25 repetitions and generates 500 trees. It provided an impressing 0.87% OOB error estimate. The downside was the relatively long time to perform the calculations. In contrast a 4-fold cross validation model using the same number of trees is indeed much faster and the results quite similar. The OOB was 0.94%.
 
-On the resulting set there are 36 factor variables that have to be inspected to see whether they are actual factor variablesor not and they could be converted to a numeric value. And within the latter, which are meaningful to our analysis. The first ones, variables 2, 5 and 6, can be excluded from this analysis as they correspond to subject's name, time stamp, and whether there was a new window or not.
-```{r factor variables}
-# Empty vector to collect the id of factor variables
-factor_var <- c()
-count <- 0
-for (i in 7:(ncol(clean_data)-1)){
-        if (class(clean_data[,i])=="factor"){
-                count <- count + 1
-                factor_var <- c(factor_var, i)
-        }
-}
-count
-rm(i, count)
-```
-For the remaining 33 variables, as they all seem to have been mistakenly entered as factors even though they contain numeric values, I will convert them to numeric values.
+One way to increase the efficiency of the model is to inspect the relative importance of the variables used. Since not all variables are equally significant it should be possible to reduce the number of variables without losing predictive accuracy.
 
-```{r cleaning factor variables, message=FALSE, warning=FALSE}
-############################################
-# Convert factors values to numeric values #
-############################################
-
-for (i in 1:length(factor_var)){
-        x <- clean_data[, factor_var[i]]
-        x <- as.numeric(levels(x))[x]
-        clean_data[, factor_var[i]] <- x
-}
-
-rm(x)
-
-###################################################################
-# Check the amount of NA values per variable after the conversion #
-###################################################################
-
-na_factor_var_id <- c()
-na_factor_var_name <- c()
-na_factor_percentage <- c()
-
-for (i in 1:ncol(clean_data)){
-        # Check NA values for each of the variables
-        na_avg <- mean(is.na(clean_data[,i]))
-        
-        # If the NA average is larger than 0 collect it in the data frame
-        if (na_avg > 0){
-                na_factor_var_id <- c(na_factor_var_id, i)
-                na_factor_var_name <- c(na_factor_var_name, names(clean_data)[i])
-                na_factor_percentage <- c(na_factor_percentage, round(na_avg, 2))
-        }
-}
-
-# Merge into a data frame
-na_factor_values <- as.data.frame(cbind(na_factor_var_id, na_factor_var_name, na_factor_percentage))
-# Assign correct data class to each column
-na_factor_values[,1] <- as.integer(as.character(na_factor_values[,1]))
-na_factor_values[,2] <- as.character(na_factor_values[,2])
-na_factor_values[,3] <- as.numeric(as.character(na_factor_values[,3]))
-rm(i, na_avg, na_factor_var_id, na_factor_var_name, na_factor_percentage)
-```
-
-
-```{r remove 98% na factor variables from train data}
-clean_data <- clean_data[,-na_factor_values$na_factor_var_id]
-```
-
-Additionally I will remove variables that are not relevant to the model, which are variables 1 to 7. They relate to observation's id, subject's name, time stamps and seemingly some observation window. These appear to track other values not directly related with the performance of the exercises.
-```{r non-relevant variables}
-names(clean_data)[1:7]
-clean_data <- clean_data[,-c(1:7)]
-```
-
-## Split data into train, testing and validation
-Before fitting a model I will split the data into three different sets, training, testing and validation, that will represent respectively 60%, 20% and 20% of the data.
-```{r split data}
-# Split the data into 60-40
-train <- createDataPartition(clean_data$classe,
-                             p = 0.6, list = FALSE)
-
-# Training set
-training <- clean_data[train,]
-
-# Create testing and validation sets
-test_valid <- clean_data[-train,]
-# Split the testing set into 50-50
-test <- createDataPartition(test_valid$classe,
-                            p = 0.5, list = FALSE)
-# Create the final testing set
-testing <- test_valid[test,]
-# Validation set
-validation <- test_valid[-test,]
-
-# nrow(training) / nrow(clean_data)
-# nrow(testing) / nrow(clean_data)
-# nrow(validation) / nrow(clean_data)     
-```
-
-## Prediction models
-
-### Correlated predictors and PCA
-
-We will leave out the last column in the data set, which is the outcome, 'classe'. We can then calculate the absolute value of the correlation between all the other variables, remove the correlation of a variable with itself, which will be the value displayed in the diagonal, and inspect the variables that show a correlation higher than 0.8.
-```{r correlation and PCA}
-# Calculate the absolute correlation among all variables, except the outcome
-# cor_table <- abs(cor(training[,-53]))
-```
-
-### Tree
-```{r tree}
-# Create the model
-tree_fit <- train(classe ~ . , method="rpart", data = training)
-
-# Compare model results against actual results
-table(predict(tree_fit, training), # Rows
-      training$classe) # Columns
-```
-
-### Bagging
-
-### Random forest
-```{r random forest}
-set.seed(2110)
-rf_fit <- train(classe ~ . , method="rf", data = training, prox = TRUE)
-rf_fit
-
-getTree(rf_fit$finalModel)
-
-# Confusion matrix
-confusionMatrix(predict(rf_fit, training),
-      training$classe)
-```
-
-```{r importance var, fig.align = 'center'}
-importance <- as.data.frame(rf_fit$finalModel$importance)
-importance$var <- row.names(importance)
-library(dplyr)
-sort_importance <- arrange(importance, MeanDecreaseGini)
-
-sort_importance$var <- factor(sort_importance$var,
-                              levels = sort_importance$var)
-
-
-ggplot(sort_importance, aes(x = var, y=MeanDecreaseGini)) +
-        geom_point() +
-        coord_flip()
-
-ggplot(sort_importance, aes(x=var, y=MeanDecreaseGini)) +
+```{r variable importance, echo=FALSE, fig.align='center', fig.height=10, fig.width=10}
+library(ggplot2)
+ggplot(sort_importance_asc, aes(x=var, y=MeanDecreaseGini)) +
         geom_bar(stat="identity", fill="red", colour="white") +
-        coord_flip()
-
-
-# Take the 50% most important variables -> 26 variables
-var_26_imp <- as.character(sort_importance$var)[1:26]
-
-# Take the 25% most important variables -> 13 variables
-var_13_imp <- as.character(sort_importance$var)[1:13]
-
-# Take the 12.5% most important variables -> 7
-var_7_imp <- as.character(sort_importance$var)[1:7]
+        coord_flip() +
+        xlab("Variables") +
+        ylab("Mean Decrease Gini") +
+        ggtitle("figure 1 - Variable importance")
 ```
 
-```{r random forest 26 variables, cache=TRUE}
-training_26 <- training[,c(var_26_imp, "classe")]
-rf_26_fit <- train(classe ~ . , data=training_25, method = "rf")
+### 3.2 Model comparison
 
-# Confusion matrix
-confusionMatrix(predict(rf_26_fit, training_25),
-      training_26$classe)
+Although there is a downward trend in accuracy as the number of variables decreases, it is outstanding how each subsequent model using just half of the variables used in the preceding one display just as much accuracy. It is also noteworthy how a 5-fold cross validation model results in as much predicting power as a bootstrap model but requires much less computing power, which makes it much more efficient.  
+  
+**Figure 2 - Comparison table**  
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;border:none;margin:0px auto;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;}
+.tg .tg-3zgm{background-color:#343434;color:#ffffff}
+.tg .tg-aq88{background-color:#343434;color:#ffffff;text-align:center}
+.tg .tg-s6z2{text-align:center}
+.tg .tg-0ord{text-align:right}
+.tg .tg-2thk{background-color:#c0c0c0;text-align:center}
+.tg .tg-tkkh{background-color:#c0c0c0;text-align:right}
+.tg .tg-hy62{background-color:#c0c0c0}
+</style>
+<table class="tg">
+  <tr>
+    <th class="tg-3zgm"></th>
+    <th class="tg-3zgm"></th>
+    <th class="tg-aq88">Error estimate %<br>OOB<br></th>
+    <th class="tg-aq88">Accuracy %<br>Testing<br></th>
+    <th class="tg-aq88">Accuracy %<br>Validation</th>
+  </tr>
+  <tr>
+    <td class="tg-s6z2">52 variables<br></td>
+    <td class="tg-0ord">Bootstrap<br></td>
+    <td class="tg-s6z2">0.87</td>
+    <td class="tg-s6z2">98.94</td>
+    <td class="tg-s6z2">99.08</td>
+  </tr>
+  <tr>
+    <td class="tg-s6z2"></td>
+    <td class="tg-0ord">5-fold CV<br></td>
+    <td class="tg-s6z2">0.94</td>
+    <td class="tg-s6z2">99.26</td>
+    <td class="tg-s6z2">99.03</td>
+  </tr>
+  <tr>
+    <td class="tg-2thk">26 variables<br></td>
+    <td class="tg-tkkh">Bootstrap<br></td>
+    <td class="tg-2thk">0.83</td>
+    <td class="tg-2thk">99.18</td>
+    <td class="tg-2thk">98.93</td>
+  </tr>
+  <tr>
+    <td class="tg-2thk"></td>
+    <td class="tg-tkkh">5-fold CV<br></td>
+    <td class="tg-2thk">0.82</td>
+    <td class="tg-2thk">99.31<br></td>
+    <td class="tg-2thk">98.98</td>
+  </tr>
+  <tr>
+    <td class="tg-s6z2">13 variables<br></td>
+    <td class="tg-0ord">Bootstrap<br></td>
+    <td class="tg-s6z2">1.74</td>
+    <td class="tg-s6z2">98.37</td>
+    <td class="tg-s6z2">98.57</td>
+  </tr>
+  <tr>
+    <td class="tg-s6z2"><br></td>
+    <td class="tg-0ord">5-fold CV<br></td>
+    <td class="tg-s6z2">1.65<br></td>
+    <td class="tg-s6z2">98.39</td>
+    <td class="tg-s6z2">98.27</td>
+  </tr>
+  <tr>
+    <td class="tg-2thk">7 variables<br></td>
+    <td class="tg-tkkh">Bootstrap<br></td>
+    <td class="tg-2thk">1.92<br></td>
+    <td class="tg-2thk">98.52</td>
+    <td class="tg-2thk">98.78</td>
+  </tr>
+  <tr>
+    <td class="tg-hy62"></td>
+    <td class="tg-tkkh">5-fold CV<br></td>
+    <td class="tg-2thk">1.86</td>
+    <td class="tg-2thk">98.39</td>
+    <td class="tg-2thk">98.75</td>
+  </tr>
+</table>
 
-# 5-fold cross validation
-fitControl <- trainControl(method="cv", number=5)
-rf_26_cv_fit <- train(classe ~ . , data=training_26, method = "rf", trControl = fitControl)
+### 4 Final model
+Using the 7 most important vsariables and fitting a 5-fold cross validation model yields excellent results in terms of OOB error estimate and final predicting accuracy, while being very efficient in terms of computing power.
 
-# Confusion matrix
-confusionMatrix(predict(rf_26_cv_fit, training_26),
-      training_26$classe)
-```
+        fitControl <- trainControl(method="cv", number=5)
+        
+        final_model <- train(classe ~ roll_belt + pitch_forearm + yaw_belt + magnet_dumbbell_y +
+                                pitch_belt + magnet_dumbbell_z + roll_forearm, 
+                                data = training,
+                                trControl = fitControl)
 
-```{r random forest 13 variables, cache=TRUE}
-training_13 <- training[,c(var_13_imp, "classe")]
-rf_13_fit <- train(classe ~ . , data=training_25, method = "rf")
-rf_13_fit
-
-# Confusion matrix
-confusionMatrix(predict(rf_13_fit, training_25),
-      training_13$classe)
-
-# 5-fold cross validation
-fitControl <- trainControl(method="cv", number=5)
-rf_13_cv_fit <- train(classe ~ . , data=training_13, method = "rf", trControl = fitControl)
-
-# Confusion matrix
-confusionMatrix(predict(rf_13_cv_fit, training_13),
-      training_13$classe)
-```
-
-```{r random forest 7 variables, cache=TRUE}
-# Standard bootstrapped random forest
-training_7 <- training[,c(var_7_imp, "classe")]
-rf_7_fit <- train(classe ~ . , data=training_7, method = "rf")
-rf_7_fit
-
-# Confusion matrix
-confusionMatrix(predict(rf_7_fit, training_7),
-                training_7$classe)
-
-
-# 5-fold cross validation
-fitControl <- trainControl(method="cv", number=5)
-rf_7_cv_fit <- train(classe ~ . , data=training_7, method = "rf", trControl = fitControl)
-
-# Confusion matrix
-confusionMatrix(predict(rf_7_cv_fit, training_7),
-                training_7$classe)
-```
-
-### Boosting
-
-## Testing the models
-Random forest with all valid variables, 53
-```{r test 53 variables}
-confusionMatrix(predict(rf_fit, testing),
-                testing$classe)
-
-
-```
-
-
-Random forest with 50% of the most important variables, 26
-```{r test 26 variables}
-testing_26 <- testing[,c(var_26_imp, "classe")]
-
-# Bootstrapped
-confusionMatrix(predict(rf_26_fit, testing_26),
-                testing_26$classe)
-
-# 5-fold cross validation
-confusionMatrix(predict(rf_26_cv_fit, testing_26),
-                testing_26$classe)
-```
-
-
-
-Random forest with 25% of the most important variables, 13
-```{r test 13 variables}
-testing_13 <- testing[,c(var_13_imp, "classe")]
-
-# Bootstrapped
-confusionMatrix(predict(rf_13_fit, testing_13),
-                testing_13$classe)
-
-# 5-fold cross validation
-confusionMatrix(predict(rf_13_cv_fit, testing_13),
-                testing_13$classe)
-```
-
-Random forest with 12.5% of the most important variables, 7
-```{r test 7 variables}
-testing_7 <- testing[,c(var_7_imp, "classe")]
-
-# Bootstrapped
-confusionMatrix(predict(rf_7_fit, testing_7),
-                testing_7$classe)
-
-# 5-fold cross validation
-confusionMatrix(predict(rf_7_cv_fit, testing_7),
-                testing_7$classe)
-```
