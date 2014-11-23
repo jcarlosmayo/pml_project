@@ -80,7 +80,7 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <div id="model-comparison" class="section level4">
 <h4>3.2 Model comparison</h4>
 <p>Several models were fitted using the variable importance data in a descending order. The first one was restricted to the 26 most important variables, 50% of the original 52 variables. Subsequently, each of the following models used half the number of variables of the preceding one.</p>
-<p>Although there is a downward trend in accuracy as the number of variables decreases, it is outstanding how each subsequent model using just half of the variables used in the preceding one display almost as much accuracy. It is also noteworthy how 5-fold cross validation is just as accurate as a bootstrap model but requires much less computing power, which makes it much more efficient.</p>
+<p>Although there is a downward trend in accuracy as the number of variables decreases, it is outstanding how each subsequent model using just half of the variables used in the preceding one display almost as much accuracy until the variables are reduced to only 4. It is also noteworthy how 5-fold cross validation is just as accurate as a bootstrap model but requires much less computing power, which makes it much more efficient.</p>
 <strong>Figure 2 - Comparison table</strong><br />
 <style type="text/css">
 .tg  {border-collapse:collapse;border-spacing:0;border:none;margin:0px auto;}
@@ -278,7 +278,7 @@ Bootstrap<br>
 </div>
 <div id="final-model" class="section level3">
 <h3>4 Final model</h3>
-<p>The diminishing accuracy rate as less and less variables are included in the model decreases most significantly when only the 4 most significant variables are used. However, using just the 7 most important variables and fitting a 5-fold cross validation model yields excellent results in terms of OOB error estimate and final predicting accuracy, while being very efficient in terms of computing power.</p>
+<p>The accuracy rate as less and less variables are included in the model decreases most appreciably when only the 4 most significant variables are used. However, a model with the 7 most important variables and fitting a 5-fold cross validation model yields excellent results in terms of OOB error estimate and final predicting accuracy, while being very efficient in terms of computing power.</p>
 <p><strong>Model fit:</strong></p>
 <pre><code>    fitControl &lt;- trainControl(method=&quot;cv&quot;, number=5)
     
