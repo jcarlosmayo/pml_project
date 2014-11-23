@@ -3,30 +3,30 @@ title: "Practical Machine Learning"
 output: html_document
 ---
 
-## 1 - Description
+### 1 - Description
 Six participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways while accelerometers on the belt, forearm, arm, and dumbell measured their performance. The original study and data can be found [here](http://groupware.les.inf.puc-rio.br/har) under the section on the Weight Lifting Exercise Dataset.
 
-The goal of this project is to predict the manner in which they did the exercise. This is reflected in the "classe" variable, which can be either of five qualitative values: A, B, C, D or E.
+The goal of this project is to predict the manner in which they did the exercise, the 'classe' variable, which can be either of five qualitative values: A, B, C, D or E.
 
-## 2 - Data Cleaning
+### 2 - Data Cleaning
 
-Including the outcome variable, the data set contains 11,776 observations and 160 variables. However, a quick exploration of the data shows that there is a huge amount of missing values and that they are concentrated in a number of variables. No explanation is provided about why there are so many missing values although in fact they affect a large percentage of the data set. In 73 of the variables 98% of the observations are missing values, and in another 27 they reach 100%.
+Including the outcome variable, the data set contains 11,776 observations and 160 variables. However, a quick exploration of the data shows that there is a huge amount of missing values and that they are concentrated in specific variables. No explanation is provided about why there are so many missing values although in fact they affect a large percentage of the data set. In 73 of the variables 98% of the observations are missing values, and in another 27 they reach 100%.
   
-It would be possible to impute them using the existing values but it seems far-fetched to recreate 98% of the data using the existing 2%. Ideally, each of the affected variables should be inspected to determine whether imputation is reasonable or not. However, for the purpose of this project, I will simply remove them from the training data.
+It would be possible to impute missing values using the existing ones but it seems far-fetched to recreate 98% of the data using the existing 2%. Therefore, they will be simply removed from the training data.
 
-Additionally I will remove variables that are not relevant to the model, and which relate to observation's id, subject's name, time stamps and observation windows. These appear to track other values not directly related with the performance of the exercises and which would be meaningless once the model constructed is fit to new data.
+Additionally, there are other seven variables not relevant to the model. They contain information on the observation's id, subject's name, time stamps and observation windows. These represent values not directly related with the performance of the exercises and they would become meaningless once the model is fit to new data.
 
-Therefore, including the outcome variable, there remain 53 variables to train a machine learning model (see fig.1).
+In summary, as a result, including the outcome variable there remain 53 variables to train a machine learning model (see fig.1).
 
-## 3 - Model selection
-Before training different models to fit the data the clean training data was split into a training set, a testing set and a validation set, corresponding respectively to 60, 20 and 20% of the data.
+### 3 - Model selection
+Before training different models to fit the data, the clean training data was split into training, testing and validation sets, which corresponded respectively to 60, 20 and 20% of the original training data.
 
-### 3.1 - Model training
-Initially a classification tree model was fit to the training set, however, the results were very poor. The in-sample accuracy was 49.91%, and , logically, it performed equally poor on the testing and validation sets with a 49.38% and 48.69% accuracay respectively.
+#### 3.1 - Model training
+Initially a classification tree model was fit to the training set, however, the results were very poor. The in-sample accuracy was 49.91%, and , logically, it performed equally poor on the testing and validation sets with a 49.38% and 48.69% accuracy respectively.
 
-The next model fitted was a random forest with all variables, 52 plus the outcome, using the default settings, which uses bootstrapping with 25 repetitions and generates 500 trees. It provided an impressing 0.87% OOB error estimate. The downside was the relatively long time to perform the calculations. In contrast a 4-fold cross validation model using the same number of trees is indeed much faster and the results quite similar. The OOB was 0.94%.
+The next model fitted was a random forest with all variables, 52 plus the outcome, using the default settings, which uses bootstrapping with 25 repetitions and generates 500 trees. It provided an impressing 0.87% OOB error estimate. The downside was the relatively long time to perform the calculations. In contrast a 5-fold cross validation model using the same number of trees was indeed much faster and the results quite similar. The OOB was 0.94%.
 
-One way to increase the efficiency of the model is to inspect the relative importance of the variables used. Since not all variables are equally significant it should be possible to reduce the number of variables without losing predictive accuracy.
+One way to increase the efficiency of the model was to inspect the relative importance of the variables used. Since not all variables are equally significant it seemed possible to reduce the number of variables without losing predictive accuracy.
 
 ```{r variable importance, echo=FALSE, fig.align='center', fig.height=10, fig.width=10}
 library(ggplot2)
@@ -38,9 +38,10 @@ ggplot(sort_importance_asc, aes(x=var, y=MeanDecreaseGini)) +
         ggtitle("figure 1 - Variable importance")
 ```
 
-### 3.2 Model comparison
+#### 3.2 Model comparison
+Several models were fitted using the variable importance data in a descending order. The first one was restricted to the 26 most important variables, 50% of the original 52 variables. Subsequently, each of the following models used half the number of variables of the preceding one.
 
-Although there is a downward trend in accuracy as the number of variables decreases, it is outstanding how each subsequent model using just half of the variables used in the preceding one display just as much accuracy. It is also noteworthy how a 5-fold cross validation model results in as much predicting power as a bootstrap model but requires much less computing power, which makes it much more efficient.  
+Although there is a downward trend in accuracy as the number of variables decreases, it is outstanding how each subsequent model using just half of the variables used in the preceding one display almost as much accuracy. It is also noteworthy how 5-fold cross validation is just as accurate as a bootstrap model but requires much less computing power, which makes it much more efficient.  
   
 **Figure 2 - Comparison table**  
 <style type="text/css">
@@ -115,14 +116,31 @@ Although there is a downward trend in accuracy as the number of variables decrea
   <tr>
     <td class="tg-hy62"></td>
     <td class="tg-tkkh">5-fold CV<br></td>
-    <td class="tg-2thk">1.86</td>
-    <td class="tg-2thk">98.39</td>
-    <td class="tg-2thk">98.75</td>
+    <td class="tg-2thk">1.88</td>
+    <td class="tg-2thk">98.16</td>
+    <td class="tg-2thk">98.32</td>
+  </tr>
+    <tr>
+    <td class="tg-s6z2">4 variables<br></td>
+    <td class="tg-0ord">Bootstrap<br></td>
+    <td class="tg-s6z2">6.8<br></td>
+    <td class="tg-s6z2">93.02</td>
+    <td class="tg-s6z2">92.74</td>
+  </tr>
+  <tr>
+    <td class="tg-s6z2"><br></td>
+    <td class="tg-0ord">5-fold CV<br></td>
+    <td class="tg-s6z2">6.93</td>
+    <td class="tg-s6z2">92.86</td>
+    <td class="tg-s6z2">92.66</td>
   </tr>
 </table>
 
 ### 4 Final model
-Using the 7 most important vsariables and fitting a 5-fold cross validation model yields excellent results in terms of OOB error estimate and final predicting accuracy, while being very efficient in terms of computing power.
+The diminishing accuracy rate as less and less variables are included in the model decreases most significantly when only the 4 most significant variables are used. However, using just the 7 most important variables and fitting a 5-fold cross validation model yields excellent results in terms of OOB error estimate and final predicting accuracy, while being very efficient in terms of computing power.
+
+
+**Model fit:**
 
         fitControl <- trainControl(method="cv", number=5)
         
@@ -131,3 +149,44 @@ Using the 7 most important vsariables and fitting a 5-fold cross validation mode
                                 data = training,
                                 trControl = fitControl)
 
+
+**Model fit summary:**
+
+        Random Forest 
+
+        11776 samples
+        7 predictor
+        5 classes: 'A', 'B', 'C', 'D', 'E' 
+
+        No pre-processing
+        Resampling: Cross-Validated (5 fold) 
+
+        Summary of sample sizes: 9420, 9420, 9421, 9421, 9422 
+
+        Resampling results across tuning parameters:
+
+        mtry  Accuracy  Kappa  Accuracy SD  Kappa SD
+        2     0.979     0.973  0.00268      0.00338 
+        4     0.979     0.973  0.00166      0.00210 
+        7     0.972     0.965  0.00311      0.00393 
+
+        Accuracy was used to select the optimal model using  the largest value.
+        The final value used for the model was mtry = 2. 
+
+
+**Final model summary:**
+
+        Call:
+        randomForest(x = x, y = y, mtry = param$mtry) 
+                       Type of random forest: classification
+                             Number of trees: 500
+        No. of variables tried at each split: 2
+
+                OOB estimate of  error rate: 1.88%
+        Confusion matrix:
+        A    B    C    D    E class.error
+        A 3301   21   22    3    1  0.01403823
+        B   28 2201   36   11    3  0.03422554
+        C    4   17 2018   15    0  0.01752678
+        D    0    3   21 1903    3  0.01398964
+        E    1   22    6    4 2132  0.01524249

@@ -201,6 +201,9 @@ var_13_imp <- as.character(sort_importance$var)[1:13]
 
 # Take the 12.5% most important variables -> 7
 var_7_imp <- as.character(sort_importance$var)[1:7]
+
+# Take the 4 most important variables -> 4
+var_4_imp <- as.character(sort_importance$var)[1:4]
 ```
 
 ```{r importance plot}
@@ -285,6 +288,30 @@ confusionMatrix(predict(rf_7_cv_fit, training_7),
                 training_7$classe)
 ```
 
+```{r random forest 4 variables, cache=TRUE}
+################
+# Bootstrapped #
+################
+training_4 <- training[,c(var_4_imp, "classe")]
+rf_4_fit <- train(classe ~ . , data=training_4, method = "rf")
+
+
+# Confusion matrix
+confusionMatrix(predict(rf_4_fit, training_4),
+                training_4$classe)
+
+
+###########################
+# 5-fold cross validation #
+###########################
+rf_4_cv_fit <- train(classe ~ . , data=training_4, method = "rf", trControl = fitControl)
+
+# Confusion matrix
+confusionMatrix(predict(rf_4_cv_fit, training_4),
+                training_4$classe)
+```
+
+
 ## Testing the models
 Tree model
 ```{r tree model test}
@@ -342,6 +369,18 @@ confusionMatrix(predict(rf_7_cv_fit, testing_7),
                 testing_7$classe)
 ```
 
+```{r test 4 variables}
+testing_4 <- testing[,c(var_4_imp, "classe")]
+
+# Bootstrapped
+confusionMatrix(predict(rf_4_fit, testing_4),
+                testing_4$classe)
+
+# 5-fold cross validation
+confusionMatrix(predict(rf_4_cv_fit, testing_4),
+                testing_4$classe)
+```
+
 ## Validation
 Tree model
 ```{r tree model test}
@@ -397,4 +436,16 @@ confusionMatrix(predict(rf_7_fit, validation_7),
 # 5-fold cross validation
 confusionMatrix(predict(rf_7_cv_fit, validation_7),
                 validation_7$classe)
+```
+
+```{r test 4 variables}
+validation_4 <- validation[,c(var_4_imp, "classe")]
+
+# Bootstrapped
+confusionMatrix(predict(rf_4_fit, validation_4),
+                validation_4$classe)
+
+# 5-fold cross validation
+confusionMatrix(predict(rf_4_cv_fit, validation_4),
+                validation_4$classe)
 ```
